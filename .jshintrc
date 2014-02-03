@@ -1,0 +1,24 @@
+{
+  "node": true
+, "nonstandard": true
+, "strict": true
+, "smarttabs": true
+, "maxlen": 1800
+, "newcap": false
+, "expr": true
+, "undef": true
+, "unused": "vars"
+, "onecase": true
+, "laxcomma": true
+, "laxbreak": true
+, "white": false
+, "shadow": true
+, "proto": true
+, "loopfunc": true
+, "boss": true
+, "validthis": true
+, "predef": [
+    "describe"
+  , "it"
+  ]
+}

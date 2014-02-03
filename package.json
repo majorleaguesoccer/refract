@@ -1,0 +1,29 @@
+{
+  "name": "refract",
+  "version": "0.0.1",
+  "description": "image resizing server",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha -R spec"
+  , "hint": "jshint index.js test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/majorleaguesoccer/refract.git"
+  },
+  "keywords": [
+    "image",
+    "resize"
+  ],
+  "author": "Bryce Kahle <bkahle@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/majorleaguesoccer/refract/issues"
+  },
+  "dependencies": {
+    "gm": "~1.14.2"
+  },
+  "devDependencies": {
+    "mocha": "~1.17.1"
+  }
+}
