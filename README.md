@@ -51,9 +51,9 @@ Filename parsing
 
 By default refract uses the following filename convention for the filename:
 
-`<width>x.ext` - resize to `width` while maintaining aspect ratio. Ex: `100x.png`
-`x<height>.ext` - resize to `height` while maintaining aspect ratio. Ex: `x200.png`
-`<width>x<height>.ext` - resize to `width` x `height` while maintaining aspect ratio. If the source and destination aspects don't match, then refract will center-crop to fully fill the output image size. Ex: `300x200.png`
+* `<width>x.ext` - resize to `width` while maintaining aspect ratio. Ex: `100x.png`
+* `x<height>.ext` - resize to `height` while maintaining aspect ratio. Ex: `x200.png`
+* `<width>x<height>.ext` - resize to `width` x `height` while maintaining aspect ratio. If the source and destination aspects don't match, then refract will center-crop to fully fill the output image size. Ex: `300x200.png`
 
 Anything else is considered a request for the original image. This logic may be changed by providing a function to the `parse` option that returns the `info` object.
 
