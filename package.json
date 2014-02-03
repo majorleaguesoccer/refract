@@ -1,11 +1,11 @@
 {
   "name": "refract",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "image resizing server",
   "main": "index.js",
   "scripts": {
-    "test": "mocha -R spec"
-  , "hint": "jshint index.js test.js"
+    "test": "mocha -R spec test.js",
+    "hint": "jshint index.js test.js"
   },
   "repository": {
     "type": "git",

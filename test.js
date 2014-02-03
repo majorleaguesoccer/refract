@@ -2,8 +2,92 @@
 
 var utils = require('./lib/utils')
   , assert = require('assert')
+  , request = require('supertest')
+  , fs = require('fs')
+  , gm = require('gm')
   , ase = assert.strictEqual
   ;
+
+function binaryParser(res, callback) {
+    res.setEncoding('binary');
+    res.data = '';
+    res.on('data', function (chunk) {
+        res.data += chunk;
+    });
+    res.on('end', function () {
+        callback(null, new Buffer(res.data, 'binary'));
+    });
+}
+
+describe('server', function () {
+  var app = require('./index')({
+    source: function (opts) {
+      return fs.createReadStream('./test/doge.jpg');
+    }
+  // , dest: function (opts) {
+  //     return fs.createWriteStream('./test/output.jpg');
+  //   }
+  });
+
+  it('should resize to square image', function (done) {
+    request(app)
+      .get('/200x200.jpg')
+      .expect('Content-Type', 'image/jpeg')
+      .expect(200)
+      .parse(binaryParser)
+      .end(function (err, res) {
+        if (err) return done(err);
+
+        gm(res.body, 'img.jpg').size({ bufferStream: true }, function (err, size) {
+          if (err) return done(err);
+          ase(size.width, 200);
+          ase(size.height, 200);
+          done();
+        });
+      });
+  });
+
+  it('should resize height only image', function (done) {
+    request(app)
+      .get('/x200.jpg')
+      .expect('Content-Type', 'image/jpeg')
+      .expect(200)
+      .parse(binaryParser)
+      .end(function (err, res) {
+        if (err) return done(err);
+
+        gm(res.body, 'img.jpg').size({ bufferStream: true }, function (err, size) {
+          if (err) return done(err);
+          ase(size.width, 203);
+          ase(size.height, 200);
+          done();
+        });
+      });
+  });
+
+  it('should resize width only image', function (done) {
+    request(app)
+      .get('/200x.jpg')
+      .expect('Content-Type', 'image/jpeg')
+      .parse(binaryParser)
+      .end(function (err, res) {
+        if (err) return done(err);
+
+        gm(res.body, 'img.jpg').size({ bufferStream: true }, function (err, size) {
+          if (err) return done(err);
+          ase(size.width, 200);
+          ase(size.height, 197);
+          done();
+        });
+      });
+  });
+
+  it('should return 404 for upscaling', function (done) {
+    request(app)
+      .get('/300x300.jpg')
+      .expect(404, done);
+  });
+});
 
 describe('utils', function () {
   describe('parseRequest', function () {
@@ -97,11 +181,11 @@ describe('utils', function () {
     });
 
     it('should handle odd sizing', function () {
-      var ops = utils.calculateOps(src, { width: 300, height: 251 });
-      ase(ops.resize.width, 300);
-      ase(ops.resize.height, null);
-      ase(ops.crop.x, 0);
-      ase(ops.crop.y, 24);
+      var ops = utils.calculateOps({ width: 226, height: 223}, { width: 200, height: 200 });
+      ase(ops.resize.width, null);
+      ase(ops.resize.height, 200);
+      ase(ops.crop.x, 1);
+      ase(ops.crop.y, 0);
     });
 
     it('should handle same aspect ratio', function () {

@@ -28,29 +28,38 @@ module.exports = function(options) {
   return http.createServer(function (req, res) {
     var uri = url.parse(req.url);
     var resizeOptions = options.parse(uri.pathname);
-    if (allowedExtensions.indexOf(resizeOptions.ext) === -1) return res.send(400);
+    if (allowedExtensions.indexOf(resizeOptions.ext) === -1) {
+      res.statusCode = 400;
+      return res.end();
+    }
 
     gm(options.source(resizeOptions), 'img'+resizeOptions.ext).size({ bufferStream: true }, function (err, size) {
       var imgStream = this;
-      if (err) return res.send(500);
+      if (err) {
+        res.statusCode = 500;
+        return res.end();
+      }
 
       // fast path for original file
       if (resizeOptions.original) {
         res.setHeader('Content-Type', mimeTypes[resizeOptions.ext]);
-        imgStream.pipe(res);
+        imgStream.stream().pipe(res);
         return;
       }
 
       var ops = utils.calculateOps(size, resizeOptions);
-      if (!ops) return res.send(404);
+      if (!ops) {
+        res.statusCode = 404;
+        return res.end();
+      }
 
       res.setHeader('Content-Type', mimeTypes[resizeOptions.ext]);
 
-      imgStream = imgStream.resize(ops.resize.width, ops.resize.height);
-      if (ops.crop) imgStream = imgStream.crop(resizeOptions.width, resizeOptions.height, ops.crop.x, ops.crop.y);
+      var midStream = imgStream.resize(ops.resize.width, ops.resize.height);
+      if (ops.crop) midStream = midStream.crop(resizeOptions.width, resizeOptions.height, ops.crop.x, ops.crop.y);
 
       // remove EXIF data
-      var finalStream = imgStream.noProfile().stream();
+      var finalStream = midStream.noProfile().stream();
       finalStream.pause();
 
       finalStream.pipe(res);
