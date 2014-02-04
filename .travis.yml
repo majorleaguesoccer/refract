@@ -2,4 +2,5 @@ language: node_js
 node_js:
   - "0.10"
 before_install:
-  - "brew install graphicsmagick"
+  - "sudo apt-get update -qq"
+  - "sudo apt-get install -qq graphicsmagick"
