@@ -24,12 +24,14 @@ describe('server', function () {
     source: function (opts) {
       return fs.createReadStream('./test/doge.jpg');
     }
+  , cacheDuration: 1000
   });
 
   it('should resize to square image', function (done) {
     request(app)
       .get('/200x200.jpg')
       .expect('Content-Type', 'image/jpeg')
+      .expect('Cache-Control', 'public, max-age=1000')
       .expect(200)
       .parse(binaryParser)
       .end(function (err, res) {

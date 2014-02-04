@@ -15,6 +15,7 @@ var http = require('http')
 function defaults(options) {
   var opt = {
     parse: utils.parseRequest
+  , cacheDuration: 2628000
   };
   for (var x in options) opt[x] = options[x];
   return opt;
@@ -46,7 +47,10 @@ module.exports = function(options) {
         return res.end();
       }
 
-      res.setHeader('Content-Type', mimeTypes[resizeOptions.ext]);
+      res.writeHead(200, {
+        'Content-Type': mimeTypes[resizeOptions.ext]
+      , 'Cache-Control': 'public, max-age='+options.cacheDuration // one month
+      });
       var midStream = imgStream;
       if (ops.resize) midStream = imgStream.resize(ops.resize.width, ops.resize.height);
       if (ops.crop) midStream = midStream.crop(resizeOptions.width, resizeOptions.height, ops.crop.x, ops.crop.y);

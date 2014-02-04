@@ -36,6 +36,7 @@ The following options may be passed in when you create the server:
 * source - **required** `function(info)` - a function which returns a readable stream for the original image. 
 * dest - _optional_ `function(info)` - a function which returns a writable stream to store the resized image. This is in addition to returning the resized image.
 * parse - _optional_ `function(path)` - overrides the default filename parsing logic to specify output image size. Must return an instance of `info`.
+* cacheDuration - _optional_ `Number` (default 2628000) - duration to set in the Cache-Control header for client caching duration.
 
 `info` is on object defined as follows
 ```
