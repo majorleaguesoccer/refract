@@ -40,13 +40,6 @@ module.exports = function(options) {
         return res.end();
       }
 
-      // fast path for original file
-      if (resizeOptions.original) {
-        res.setHeader('Content-Type', mimeTypes[resizeOptions.ext]);
-        imgStream.stream().pipe(res);
-        return;
-      }
-
       var ops = utils.calculateOps(size, resizeOptions);
       if (!ops) {
         res.statusCode = 404;
@@ -54,8 +47,8 @@ module.exports = function(options) {
       }
 
       res.setHeader('Content-Type', mimeTypes[resizeOptions.ext]);
-
-      var midStream = imgStream.resize(ops.resize.width, ops.resize.height);
+      var midStream = imgStream;
+      if (ops.resize) midStream = imgStream.resize(ops.resize.width, ops.resize.height);
       if (ops.crop) midStream = midStream.crop(resizeOptions.width, resizeOptions.height, ops.crop.x, ops.crop.y);
 
       // remove EXIF data
@@ -63,7 +56,10 @@ module.exports = function(options) {
       finalStream.pause();
 
       finalStream.pipe(res);
-      if (options.dest) finalStream.pipe(options.dest(resizeOptions));
+      if (options.dest) {
+        var destStream = options.dest(resizeOptions);
+        if (destStream) finalStream.pipe(destStream);
+      }
 
       finalStream.resume();
     });

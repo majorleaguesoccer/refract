@@ -24,9 +24,6 @@ describe('server', function () {
     source: function (opts) {
       return fs.createReadStream('./test/doge.jpg');
     }
-  // , dest: function (opts) {
-  //     return fs.createWriteStream('./test/output.jpg');
-  //   }
   });
 
   it('should resize to square image', function (done) {
@@ -86,6 +83,12 @@ describe('server', function () {
     request(app)
       .get('/300x300.jpg')
       .expect(404, done);
+  });
+
+  it('should return 400 for unsupported extension', function (done) {
+    request(app)
+      .get('/300x300.svg')
+      .expect(400, done);
   });
 });
 

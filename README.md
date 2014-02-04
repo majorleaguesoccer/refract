@@ -15,6 +15,8 @@ Installation
 npm install refract
 ```
 
+**Note:** refract depends upon the `gm` module which requires you have GraphicsMagick or ImageMagick installed. For instructions, consult the [gm docs](https://github.com/aheckmann/gm#getting-started).
+
 Usage
 -----
 
@@ -57,12 +59,6 @@ By default refract uses the following filename convention for the filename:
 * `<width>x<height>.ext` - resize to `width` x `height` while maintaining aspect ratio. If the source and destination aspects don't match, then refract will center-crop to fully fill the output image size. Ex: `300x200.png`
 
 Anything else is considered a request for the original image. This logic may be changed by providing a function to the `parse` option that returns the `info` object.
-
-
-Dependencies
-------------
-
-refract depends upon the `gm` module which requires you have GraphicsMagick or ImageMagick installed. For more information, look at the [gm docs](https://github.com/aheckmann/gm#getting-started).
 
 
 License
