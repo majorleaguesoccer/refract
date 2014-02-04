@@ -36,7 +36,14 @@ module.exports = function(options) {
       return res.end();
     }
 
-    gm(options.source(resizeOptions), 'img'+resizeOptions.ext).size({ bufferStream: true }, function (err, size) {
+    var src = options.source(resizeOptions);
+
+    src.on('error', function (resp) {
+      res.statusCode = 404;
+      return res.end();
+    });
+
+    gm(src, 'img'+resizeOptions.ext).size({ bufferStream: true }, function (err, size) {
       var imgStream = this;
       if (err) {
         res.statusCode = 500;
