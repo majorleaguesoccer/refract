@@ -4,7 +4,7 @@ refract
 [![Build Status](https://travis-ci.org/majorleaguesoccer/refract.png?branch=master)](https://travis-ci.org/majorleaguesoccer/refract)
 [![devDependency Status](https://david-dm.org/majorleaguesoccer/refract.png)](https://david-dm.org/majorleaguesoccer/refract#info=dependencies)
 
-[![NPM](https://nodei.co/npm/refract.png?downloads=true&stars=true)](https://nodei.co/npm/refract/)
+[![NPM](https://nodei.co/npm/refract.png)](https://nodei.co/npm/refract/)
 
 refract is a simple image resizing server. By default it will respond to convention based filenames to specify the output image size.
 
