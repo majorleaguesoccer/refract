@@ -1,6 +1,6 @@
 {
   "name": "refract",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "image resizing server",
   "main": "index.js",
   "scripts": {
@@ -24,6 +24,7 @@
     "gm": "~1.14.2"
   },
   "devDependencies": {
-    "mocha": "~1.17.1"
+    "mocha": "~1.17.1",
+    "supertest": "~0.9.0"
   }
 }
