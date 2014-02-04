@@ -66,6 +66,10 @@ module.exports = function(options) {
 
       // remove EXIF data
       var finalStream = midStream.noProfile().stream();
+      if (options.through) {
+        var throughStream = options.through(resizeOptions);
+        if (throughStream) finalStream = finalStream.pipe(throughStream);
+      }
       finalStream.pause();
 
       finalStream.pipe(res);
