@@ -62,7 +62,10 @@ module.exports = function(options) {
       });
       var midStream = imgStream;
       if (ops.resize) midStream = imgStream.resize(ops.resize.width, ops.resize.height);
-      if (ops.crop) midStream = midStream.crop(resizeOptions.width, resizeOptions.height, ops.crop.x, ops.crop.y);
+      if (ops.crop) {
+        midStream = midStream.crop(resizeOptions.width, resizeOptions.height, ops.crop.x, ops.crop.y);
+        resizeOptions.cropped = true;
+      }
 
       // remove EXIF data
       var finalStream = midStream.noProfile().stream();
