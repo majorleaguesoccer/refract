@@ -29,6 +29,8 @@ module.exports = function(options) {
   return http.createServer(function (req, res) {
     var uri = url.parse(req.url);
     var resizeOptions = options.parse(uri.pathname);
+    resizeOptions.cacheDuration = options.cacheDuration;
+
     if (allowedExtensions.indexOf(resizeOptions.ext) === -1) {
       res.statusCode = 400;
       return res.end();
