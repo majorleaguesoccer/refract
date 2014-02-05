@@ -1,6 +1,6 @@
 {
   "name": "refract",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "image resizing server",
   "main": "index.js",
   "scripts": {

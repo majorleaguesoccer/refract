@@ -61,7 +61,11 @@ module.exports = function(options) {
       , 'Cache-Control': 'public, max-age='+options.cacheDuration // one month
       });
       var midStream = imgStream;
-      if (ops.resize) midStream = imgStream.resize(ops.resize.width, ops.resize.height);
+      if (ops.resize) {
+        midStream = imgStream
+          .resize(ops.resize.width, ops.resize.height)
+          .quality(resizeOptions.ext === '.png' ? 100 : 85);
+      }
       if (ops.crop) {
         midStream = midStream.crop(resizeOptions.width, resizeOptions.height, ops.crop.x, ops.crop.y);
         resizeOptions.cropped = true;
