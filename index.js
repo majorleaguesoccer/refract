@@ -36,20 +36,28 @@ module.exports = function(options) {
       return res.end();
     }
 
+    var modifiedSince = req.headers['if-modified-since'];
+    if (modifiedSince) resizeOptions.modifiedSince = new Date(modifiedSince);
+
     options.source(resizeOptions, function (err, src, lastModified) {
       if (err) {
         res.statusCode = 500;
         return res.end();
       }
 
-      var modifiedSince = req.headers['if-modified-since'];
-      if (modifiedSince && Date.parse(modifiedSince) >= +lastModified) {
+      if (resizeOptions.modifiedSince && 
+        +resizeOptions.modifiedSince >= +lastModified) {
         res.statusCode = 304;
         return res.end();
       }
 
-      src.on('error', function (resp) {
+      if (!src) {
         res.statusCode = 404;
+        return res.end();
+      }
+
+      src.on('error', function (resp) {
+        res.statusCode = 500;
         return res.end();
       });
 
