@@ -20,9 +20,10 @@ function binaryParser(res, callback) {
 }
 
 describe('server', function () {
+  var date = new Date();
   var app = require('./index')({
-    source: function (opts) {
-      return fs.createReadStream('./test/doge.jpg');
+    source: function (opts, next) {
+      next(null, fs.createReadStream('./test/doge.jpg'), new Date(date.toUTCString()));
     }
   , cacheDuration: 1000
   });
@@ -32,6 +33,7 @@ describe('server', function () {
       .get('/200x200.jpg')
       .expect('Content-Type', 'image/jpeg')
       .expect('Cache-Control', 'public, max-age=1000')
+      .expect('Last-Modified', date.toUTCString())
       .expect(200)
       .parse(binaryParser)
       .end(function (err, res) {
@@ -44,6 +46,20 @@ describe('server', function () {
           done();
         });
       });
+  });
+
+  it('should return 304 if not modified', function (done) {
+    request(app)
+      .get('/200x200.jpg')
+      .set('If-Modified-Since', date.toUTCString())
+      .expect(304, done);
+  });
+
+  it('should return resized if modified', function (done) {
+    request(app)
+      .get('/200x200.jpg')
+      .set('If-Modified-Since', new Date(+date - 1000).toUTCString())
+      .expect(200, done);
   });
 
   it('should resize height only image', function (done) {

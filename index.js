@@ -36,56 +36,76 @@ module.exports = function(options) {
       return res.end();
     }
 
-    var src = options.source(resizeOptions);
-
-    src.on('error', function (resp) {
-      res.statusCode = 404;
-      return res.end();
-    });
-
-    gm(src, 'img'+resizeOptions.ext).size({ bufferStream: true }, function (err, size) {
-      var imgStream = this;
+    options.source(resizeOptions, function (err, src, lastModified) {
       if (err) {
         res.statusCode = 500;
         return res.end();
       }
 
-      var ops = utils.calculateOps(size, resizeOptions);
-      if (!ops) {
-        res.statusCode = 404;
+      var modifiedSince = req.headers['if-modified-since'];
+      if (modifiedSince && Date.parse(modifiedSince) >= +lastModified) {
+        res.statusCode = 304;
         return res.end();
       }
 
-      res.writeHead(200, {
-        'Content-Type': mimeTypes[resizeOptions.ext]
-      , 'Cache-Control': 'public, max-age='+options.cacheDuration // one month
+      src.on('error', function (resp) {
+        res.statusCode = 404;
+        return res.end();
       });
-      var midStream = imgStream;
-      if (ops.resize) {
-        midStream = imgStream
-          .resize(ops.resize.width, ops.resize.height)
-          .quality(resizeOptions.ext === '.png' ? 100 : 85);
-      }
-      if (ops.crop) {
-        midStream = midStream.crop(resizeOptions.width, resizeOptions.height, ops.crop.x, ops.crop.y);
-        resizeOptions.cropped = true;
-      }
 
-      // remove EXIF data
-      var finalStream = midStream.noProfile().stream();
-      if (options.through) {
-        var throughStream = options.through(resizeOptions);
-        if (throughStream) finalStream = finalStream.pipe(throughStream);
-      }
-      finalStream.pause();
+      gm(src, 'img'+resizeOptions.ext).size({ bufferStream: true }, function (err, size) {
+        var imgStream = this;
+        if (err) {
+          res.statusCode = 500;
+          return res.end();
+        }
 
-      finalStream.pipe(res);
-      if (options.dest) {
-        var destStream = options.dest(resizeOptions);
-        if (destStream) finalStream.pipe(destStream);
-      }
+        var ops = utils.calculateOps(size, resizeOptions);
+        if (!ops) {
+          res.statusCode = 404;
+          return res.end();
+        }
 
-      finalStream.resume();
+        res.writeHead(200, {
+          'Content-Type': mimeTypes[resizeOptions.ext]
+        , 'Cache-Control': 'public, max-age='+options.cacheDuration // one month
+        , 'Last-Modified': (lastModified || new Date()).toUTCString()
+        });
+        var midStream = imgStream;
+        if (ops.resize) {
+          midStream = imgStream
+            .resize(ops.resize.width, ops.resize.height)
+            .quality(resizeOptions.ext === '.png' ? 100 : 85);
+        }
+        if (ops.crop) {
+          midStream = midStream.crop(resizeOptions.width, resizeOptions.height, ops.crop.x, ops.crop.y);
+          resizeOptions.cropped = true;
+        }
+
+        // remove EXIF data
+        var finalStream = midStream.noProfile().stream();
+        if (options.through) {
+          var throughStream = options.through(resizeOptions);
+          if (throughStream) finalStream = finalStream.pipe(throughStream);
+        }
+        finalStream.pause();
+
+        finalStream.pipe(res);
+        
+        if (options.dest) {
+          options.dest(resizeOptions, function (err, destStream) {
+            if (err) {
+              res.statusCode = 500;
+              return res.end();
+            }
+            if (destStream) finalStream.pipe(destStream);
+            finalStream.resume();
+          });
+          return;
+        }
+
+        finalStream.resume();
+      });
     });
   });
 };

@@ -33,9 +33,9 @@ Options
 
 The following options may be passed in when you create the server:
 
-* source - **required** `function(info)` - a function which returns a readable stream for the original image. 
+* source - **required** `function(info)` - a function which calls a callback `function(err, stream, dateModified)` with a readable stream for the original image and the last date modified. 
 * through - _optional_ `function(info)` - a function which returns a writeable stream that will be used to perform modifications after the resize/crop operations. 
-* dest - _optional_ `function(info)` - a function which returns a writable stream to store the resized image. This is in addition to returning the resized image.
+* dest - _optional_ `function(info)` - a function which calls a callback `function(err, stream)` with a writable stream to store the resized image. This is in addition to returning the resized image as the HTTP response.
 * parse - _optional_ `function(path)` - overrides the default filename parsing logic to specify output image size. Must return an instance of `info`.
 * cacheDuration - _optional_ `Number` (default 2628000) - duration to set in the Cache-Control header for client caching duration.
 
