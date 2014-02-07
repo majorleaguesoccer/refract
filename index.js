@@ -4,6 +4,7 @@ var http = require('http')
   , url = require('url')
   , gm = require('gm')
   , utils = require('./lib/utils')
+  , stream = require('stream')
   , allowedExtensions = ['.png', '.jpg']
   ;
 
@@ -56,10 +57,12 @@ module.exports = function(options) {
         return res.end();
       }
 
-      src.on('error', function (resp) {
-        res.statusCode = 500;
-        return res.end();
-      });
+      if (src instanceof stream.Readable) {
+        src.on('error', function (resp) {
+          res.statusCode = 500;
+          return res.end();
+        });
+      }
 
       gm(src, 'img'+resizeOptions.ext).size({ bufferStream: true }, function (err, size) {
         var imgStream = this;
