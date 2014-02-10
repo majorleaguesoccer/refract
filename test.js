@@ -3,8 +3,10 @@
 var utils = require('./lib/utils')
   , assert = require('assert')
   , request = require('supertest')
+  , refract = require('./index')
   , fs = require('fs')
   , gm = require('gm')
+  , stream = require('stream')
   , ase = assert.strictEqual
   ;
 
@@ -21,7 +23,7 @@ function binaryParser(res, callback) {
 
 describe('server', function () {
   var date = new Date();
-  var app = require('./index')({
+  var app = refract({
     source: function (opts, next) {
       next(null, fs.createReadStream('./test/doge.jpg'), new Date(date.toUTCString()));
     }
@@ -107,6 +109,62 @@ describe('server', function () {
     request(app)
       .get('/300x300.svg')
       .expect(400, done);
+  });
+
+  var srcError = refract({
+    source: function (opts, next) {
+      next(null, fs.createReadStream('./test/nonexistantfile.jpg'), new Date(date.toUTCString()));
+    }
+  });
+  var throughError = refract({
+    source: function (opts, next) {
+      next(null, fs.createReadStream('./test/doge.jpg'), new Date(date.toUTCString()));
+    }
+  , through: function (opts) {
+      var ts = new stream.Transform();
+      ts._transform = function(chunk, encoding, callback) {
+        callback(new Error());
+      };
+      return ts;
+    }
+  });
+  var destError = refract({
+    source: function (opts, next) {
+      next(null, fs.createReadStream('./test/doge.jpg'), new Date(date.toUTCString()));
+    }
+  , dest: function (opts, next) {
+      var ws = new stream.Writable();
+      ws._write = function(chunk, encoding, callback) {
+        callback(new Error());
+      };
+      next(null, ws);
+    }
+  });
+
+  it('should return 500 for source stream error', function (done) {
+    request(srcError)
+      .get('/x200.jpg')
+      .expect(500, done);
+  });
+  it('should return 500 for through stream error', function (done) {
+    request(throughError)
+      .get('/x200.jpg')
+      .expect(500)
+      .end(function (err, res) {
+        if (err) return done(err);
+        if (res.header['cache-control']) return done(new Error('Cache-Control should be empty'));
+        done();
+      });
+  });
+  it('should return 500 for destination stream error', function (done) {
+    request(destError)
+      .get('/x200.jpg')
+      .expect(500)
+      .end(function (err, res) {
+        if (err) return done(err);
+        if (res.header['cache-control']) return done(new Error('Cache-Control should be empty'));
+        done();
+      });
   });
 });
 
