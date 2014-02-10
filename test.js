@@ -29,6 +29,13 @@ describe('server', function () {
     }
   , cacheDuration: 1000
   });
+  var srcBuffer = refract({
+    source: function (opts, next) {
+      fs.readFile('./test/doge.jpg', function (err, data) {
+        next(err, data, new Date(date.toUTCString()));
+      });
+    }
+  });
 
   it('should resize to square image', function (done) {
     request(app)
@@ -84,6 +91,23 @@ describe('server', function () {
 
   it('should resize width only image', function (done) {
     request(app)
+      .get('/200x.jpg')
+      .expect('Content-Type', 'image/jpeg')
+      .parse(binaryParser)
+      .end(function (err, res) {
+        if (err) return done(err);
+
+        gm(res.body, 'img.jpg').size({ bufferStream: true }, function (err, size) {
+          if (err) return done(err);
+          ase(size.width, 200);
+          ase(size.height, 197);
+          done();
+        });
+      });
+  });
+
+  it('should resize from source buffer', function (done) {
+    request(srcBuffer)
       .get('/200x.jpg')
       .expect('Content-Type', 'image/jpeg')
       .parse(binaryParser)
