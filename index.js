@@ -8,6 +8,10 @@ var http = require('http')
   , domain = require('domain')
   , Stream = require('stream').Stream
   , allowedExtensions = ['.png', '.jpg']
+  , cache = require('memory-cache')
+  , concat = require('concat-stream')
+  , inProgress = {}
+  , Q = require('q')
   ;
 
   var mimeTypes = {
@@ -19,6 +23,8 @@ function defaults(options) {
   var opt = {
     parse: utils.parseRequest
   , cacheDuration: 2628000
+  , memoryCache: true
+  , memoryCacheDuration: 30000
   };
   for (var x in options) opt[x] = options[x];
   return opt;
@@ -42,6 +48,36 @@ module.exports = function(options) {
     d.add(res);
 
     d.run(function () {
+      // if we are doing memory caching and we haven't cached yet
+      // queue up requests after the first one, and then resolve them 
+      // with that result
+      var uri = url.parse(req.url);
+      if (options.memoryCache && !cache.get(uri.pathname)) {
+        var otherReq = inProgress[uri.pathname];
+        if (otherReq) {
+          otherReq.then(function () {
+            handleRequest(options, req, res, d);
+          });
+        } else {
+          var deferred = Q.defer();
+          inProgress[uri.pathname] = deferred.promise;
+
+          res.on('finish', function () {
+            deferred.resolve();
+            delete inProgress[uri.pathname];
+          });
+          // not the greatest way to handle this, but works
+          // all the queued requests will stomp
+          res.on('close', function () {
+            inProgress[uri.pathname].resolve();
+            delete inProgress[uri.pathname];
+          });
+
+          handleRequest(options, req, res, d);
+        }
+        return;
+      }
+
       handleRequest(options, req, res, d);
     });
   });
@@ -56,6 +92,16 @@ function handleRequest(options, req, res, d) {
   if (allowedExtensions.indexOf(resizeOptions.ext) === -1) {
     res.statusCode = 400;
     return res.end();
+  }
+
+  if (options.memoryCache) {
+    var cachedResponse = cache.get(uri.pathname);
+    if (cachedResponse) {
+      res.setHeader('Content-Type', mimeTypes[resizeOptions.ext]);
+      res.setHeader('Cache-Control', 'public, max-age='+options.cacheDuration); // one month
+      res.setHeader('Last-Modified', cachedResponse.lastModified.toUTCString());
+      return res.end(cachedResponse.buffer);
+    }
   }
 
   var modifiedSince = req.headers['if-modified-since'];
@@ -128,9 +174,16 @@ function handleRequest(options, req, res, d) {
       return res.end();
     }
 
+    var modified = lastModified || new Date();
     res.setHeader('Content-Type', mimeTypes[resizeOptions.ext]);
     res.setHeader('Cache-Control', 'public, max-age='+options.cacheDuration); // one month
-    res.setHeader('Last-Modified', (lastModified || new Date()).toUTCString());
+    res.setHeader('Last-Modified', modified.toUTCString());
+
+    if (options.memoryCache && !cache.get(uri.pathname)) {
+      d.add(finalStream.pipe(concat(function (buffer) {
+        cache.put(uri.pathname, { buffer: buffer, lastModified: modified }, options.memoryCacheDuration);
+      })));
+    }
 
     finalStream.pipe(res);
   });
