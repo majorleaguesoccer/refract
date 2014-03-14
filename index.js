@@ -8,9 +8,7 @@ var http = require('http')
   , domain = require('domain')
   , Stream = require('stream').Stream
   , allowedExtensions = ['.png', '.jpg']
-  , cache = require('memory-cache')
   , concat = require('concat-stream')
-  , inProgress = {}
   , Q = require('q')
   ;
 
@@ -31,6 +29,11 @@ function defaults(options) {
 }
 
 module.exports = function(options) {
+  var inProgress = {}
+    , cache = require('memory-cache')
+    ;
+  delete require.cache[require.resolve('memory-cache')];
+
   options = defaults(options);
   if (!options.source) throw new Error('You must provide a source stream function');
   if (!options.parse) throw new Error('You must provide a request parsing function');
@@ -56,7 +59,7 @@ module.exports = function(options) {
         var otherReq = inProgress[uri.pathname];
         if (otherReq) {
           otherReq.then(function () {
-            handleRequest(options, req, res, d);
+            handleRequest(options, req, res, d, cache);
           });
         } else {
           var deferred = Q.defer();
@@ -73,18 +76,18 @@ module.exports = function(options) {
             delete inProgress[uri.pathname];
           });
 
-          handleRequest(options, req, res, d);
+          handleRequest(options, req, res, d, cache);
         }
         return;
       }
 
-      handleRequest(options, req, res, d);
+      handleRequest(options, req, res, d, cache);
     });
   });
   return server;
 };
 
-function handleRequest(options, req, res, d) {
+function handleRequest(options, req, res, d, cache) {
   var uri = url.parse(req.url);
   var resizeOptions = options.parse(uri.pathname);
   resizeOptions.cacheDuration = options.cacheDuration;
@@ -94,18 +97,27 @@ function handleRequest(options, req, res, d) {
     return res.end();
   }
 
+  var modifiedSince = req.headers['if-modified-since'];
+  if (modifiedSince) resizeOptions.modifiedSince = new Date(modifiedSince);
+
   if (options.memoryCache) {
     var cachedResponse = cache.get(uri.pathname);
     if (cachedResponse) {
+      // handle 304s even from memory cache
+      if (resizeOptions.modifiedSince && +resizeOptions.modifiedSince >= +cachedResponse.lastModified) {
+        res.removeHeader('Cache-Control');
+        res.removeHeader('Last-Modified');
+        res.removeHeader('Content-Type');
+        res.statusCode = 304;
+        return res.end();
+      }
+
       res.setHeader('Content-Type', mimeTypes[resizeOptions.ext]);
       res.setHeader('Cache-Control', 'public, max-age='+options.cacheDuration); // one month
       res.setHeader('Last-Modified', cachedResponse.lastModified.toUTCString());
       return res.end(cachedResponse.buffer);
     }
   }
-
-  var modifiedSince = req.headers['if-modified-since'];
-  if (modifiedSince) resizeOptions.modifiedSince = new Date(modifiedSince);
 
   async.waterfall([
     function (cb) {
