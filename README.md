@@ -1,5 +1,4 @@
-refract
-=======
+# refract
 
 [![Build Status](https://travis-ci.org/majorleaguesoccer/refract.png?branch=master)](https://travis-ci.org/majorleaguesoccer/refract)
 [![devDependency Status](https://david-dm.org/majorleaguesoccer/refract.png)](https://david-dm.org/majorleaguesoccer/refract#info=dependencies)
