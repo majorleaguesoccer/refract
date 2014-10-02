@@ -113,7 +113,7 @@ function handleRequest(options, req, res, d, cache) {
       }
 
       res.setHeader('Content-Type', mimeTypes[resizeOptions.ext]);
-      res.setHeader('Cache-Control', 'public, max-age='+options.cacheDuration); // one month
+      res.setHeader('Cache-Control', 'public, max-age='+cachedResponse.cacheDuration); // one month
       res.setHeader('Last-Modified', cachedResponse.lastModified.toUTCString());
       return res.end(cachedResponse.buffer);
     }
@@ -188,12 +188,12 @@ function handleRequest(options, req, res, d, cache) {
 
     var modified = lastModified || new Date();
     res.setHeader('Content-Type', mimeTypes[resizeOptions.ext]);
-    res.setHeader('Cache-Control', 'public, max-age='+options.cacheDuration); // one month
+    res.setHeader('Cache-Control', 'public, max-age='+resizeOptions.cacheDuration);
     res.setHeader('Last-Modified', modified.toUTCString());
 
     if (options.memoryCache && !cache.get(uri.pathname)) {
       d.add(finalStream.pipe(concat(function (buffer) {
-        cache.put(uri.pathname, { buffer: buffer, lastModified: modified }, options.memoryCacheDuration);
+        cache.put(uri.pathname, { buffer: buffer, lastModified: modified, cacheDuration: resizeOptions.cacheDuration }, options.memoryCacheDuration);
       })));
     }
 
