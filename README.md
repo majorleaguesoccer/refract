@@ -48,6 +48,7 @@ The following options may be passed in when you create the server:
 , height: // requested output height
 , cropped: // boolean - true if the source image had to be cropped to fit the output dimensions
 , modifiedSince: // `Date` object of the `if-modified-since` header sent by the client
+, cacheDuration : // cache duration in seconds. You may override this per request.
 }
 ```
 
