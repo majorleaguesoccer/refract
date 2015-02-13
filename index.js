@@ -43,7 +43,7 @@ module.exports = function(options) {
   var server = http.createServer(function (req, res) {
     var d = domain.create();
     d.on('error', function (err) {
-      if (options.debug) console.error(err);
+      if (options.debug) console.error(err, err.stack);
       res.removeHeader('Cache-Control');
       res.removeHeader('Last-Modified');
       res.removeHeader('Content-Type');
@@ -127,7 +127,7 @@ function handleRequest(options, req, res, d, cache) {
     function (cb) {
       options.source(resizeOptions, function (err, src, lastModified) {
         if (err) {
-          if (options.debug) console.error(err);
+          if (options.debug) console.error(err, err.stack);
           return cb(500);
         }
         if (resizeOptions.modifiedSince && 
@@ -143,7 +143,7 @@ function handleRequest(options, req, res, d, cache) {
   , function (src, lastModified, cb) {
       gm(src, 'img'+resizeOptions.ext).size({ bufferStream: true }, function (err, size) {
         if (err) {
-          if (options.debug) console.error(err);
+          if (options.debug) console.error(err, err.stack);
           return cb(500);
         }
         
@@ -177,7 +177,7 @@ function handleRequest(options, req, res, d, cache) {
       if (options.dest) {
         options.dest(resizeOptions, function (err, destStream) {
           if (err) {
-            if (options.debug) console.error(err);
+            if (options.debug) console.error(err, err.stack);
             return cb(500);
           }
           if (destStream) {
@@ -192,7 +192,7 @@ function handleRequest(options, req, res, d, cache) {
     }
   ], function (err, finalStream, lastModified) {
     if (err) {
-      if (options.debug) console.error(req.url, err);
+      if (options.debug) console.error(req.url, err, err.stack);
       if (!res.headersSent) {
         res.removeHeader('Cache-Control');
         res.removeHeader('Last-Modified');
