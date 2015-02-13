@@ -25,6 +25,7 @@ function defaults(options) {
   , memoryCache: true
   , memoryCacheDuration: 30000
   , debug: false
+  , imageMagick: false
   };
   for (var x in options) opt[x] = options[x];
   return opt;
@@ -141,7 +142,7 @@ function handleRequest(options, req, res, d, cache) {
       });
     }
   , function (src, lastModified, cb) {
-      gm(src, 'img'+resizeOptions.ext).size({ bufferStream: true }, function (err, size) {
+      gm(src, 'img'+resizeOptions.ext).options({ imageMagick: options.imageMagick }).size({ bufferStream: true }, function (err, size) {
         if (err) {
           if (options.debug) console.error(err, err.stack);
           return cb(500);
