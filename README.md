@@ -33,7 +33,8 @@ The following options may be passed in when you create the server:
 * through - _optional_ `function(info)` - a function which returns a writeable stream that will be used to perform modifications after the resize/crop operations. 
 * dest - _optional_ `function(info)` - a function which calls a callback `function(err, stream)` with a writable stream to store the resized image. This is in addition to returning the resized image as the HTTP response.
 * parse - _optional_ `function(path)` - overrides the default filename parsing logic to specify output image size. Must return an instance of `info`.
-* cacheDuration - _optional_ `Number` (default 2628000s) - duration to set in the Cache-Control header for client caching duration.
+* cacheDuration - _optional_ `Number` (default 2628000s) - duration to set for s-maxage in the Cache-Control header for intermediate caching duration.
+* clientCacheDuration - _optional_ `Number` (default 3600s) - duration to set for max-age in the Cache-Control header for client caching duration.
 * memoryCache - _optional_ `Boolean` (default true) - cache in memory the resized image output. See more information about memory cache below.
 * memoryCacheDuration - _optional_ `Number` (default 30000ms) - duration to cache in memory resized image output
 
@@ -48,7 +49,8 @@ The following options may be passed in when you create the server:
 , height: // requested output height
 , cropped: // boolean - true if the source image had to be cropped to fit the output dimensions
 , modifiedSince: // `Date` object of the `if-modified-since` header sent by the client
-, cacheDuration : // cache duration in seconds. You may override this per request.
+, cacheDuration : // cache duration in seconds. You may override this per request. Equivalent to s-maxage HTTP header.
+, clientCacheDuration : // client cache duration in seconds. You may override this per request. Equivalent to max-age HTTP header.
 }
 ```
 

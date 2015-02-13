@@ -21,6 +21,7 @@ function defaults(options) {
   var opt = {
     parse: utils.parseRequest
   , cacheDuration: 2628000
+  , clientCacheDuration: 3600
   , memoryCache: true
   , memoryCacheDuration: 30000
   };
@@ -91,6 +92,7 @@ function handleRequest(options, req, res, d, cache) {
   var uri = url.parse(req.url);
   var resizeOptions = options.parse(uri.pathname);
   resizeOptions.cacheDuration = options.cacheDuration;
+  resizeOptions.clientCacheDuration = options.clientCacheDuration;
 
   if (allowedExtensions.indexOf(resizeOptions.ext) === -1) {
     res.statusCode = 400;
@@ -113,7 +115,7 @@ function handleRequest(options, req, res, d, cache) {
       }
 
       res.setHeader('Content-Type', mimeTypes[resizeOptions.ext]);
-      res.setHeader('Cache-Control', 'public, max-age='+cachedResponse.cacheDuration); // one month
+      res.setHeader('Cache-Control', 'public, s-maxage='+cachedResponse.cacheDuration + ', max-age=' + cachedResponse.clientCacheDuration); // one month
       res.setHeader('Last-Modified', cachedResponse.lastModified.toUTCString());
       return res.end(cachedResponse.buffer);
     }
@@ -188,12 +190,12 @@ function handleRequest(options, req, res, d, cache) {
 
     var modified = lastModified || new Date();
     res.setHeader('Content-Type', mimeTypes[resizeOptions.ext]);
-    res.setHeader('Cache-Control', 'public, max-age='+resizeOptions.cacheDuration);
+    res.setHeader('Cache-Control', 'public, s-maxage='+resizeOptions.cacheDuration+', max-age='+resizeOptions.clientCacheDuration);
     res.setHeader('Last-Modified', modified.toUTCString());
 
     if (options.memoryCache && !cache.get(uri.pathname)) {
       d.add(finalStream.pipe(concat(function (buffer) {
-        cache.put(uri.pathname, { buffer: buffer, lastModified: modified, cacheDuration: resizeOptions.cacheDuration }, options.memoryCacheDuration);
+        cache.put(uri.pathname, { buffer: buffer, lastModified: modified, cacheDuration: resizeOptions.cacheDuration, clientCacheDuration: resizeOptions.clientCacheDuration }, options.memoryCacheDuration);
       })));
     }
 

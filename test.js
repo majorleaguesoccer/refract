@@ -28,6 +28,7 @@ describe('server', function () {
       next(null, fs.createReadStream('./test/doge.jpg'), new Date(date.toUTCString()));
     }
   , cacheDuration: 1000
+  , clientCacheDuration: 30
   });
   var srcBuffer = refract({
     source: function (opts, next) {
@@ -41,7 +42,7 @@ describe('server', function () {
     request(app)
       .get('/200x200.jpg')
       .expect('Content-Type', 'image/jpeg')
-      .expect('Cache-Control', 'public, max-age=1000')
+      .expect('Cache-Control', 'public, s-maxage=1000, max-age=30')
       .expect('Last-Modified', date.toUTCString())
       .expect(200)
       .parse(binaryParser)
