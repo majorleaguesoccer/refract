@@ -24,6 +24,7 @@ function defaults(options) {
   , clientCacheDuration: 3600
   , memoryCache: true
   , memoryCacheDuration: 30000
+  , debug: false
   };
   for (var x in options) opt[x] = options[x];
   return opt;
@@ -41,7 +42,8 @@ module.exports = function(options) {
 
   var server = http.createServer(function (req, res) {
     var d = domain.create();
-    d.on('error', function (er) {
+    d.on('error', function (err) {
+      if (options.debug) console.error(err);
       res.removeHeader('Cache-Control');
       res.removeHeader('Last-Modified');
       res.removeHeader('Content-Type');
@@ -124,7 +126,10 @@ function handleRequest(options, req, res, d, cache) {
   async.waterfall([
     function (cb) {
       options.source(resizeOptions, function (err, src, lastModified) {
-        if (err) return cb(500);
+        if (err) {
+          if (options.debug) console.error(err);
+          return cb(500);
+        }
         if (resizeOptions.modifiedSince && 
           +resizeOptions.modifiedSince >= +lastModified) {
           return cb(304);
@@ -137,7 +142,10 @@ function handleRequest(options, req, res, d, cache) {
     }
   , function (src, lastModified, cb) {
       gm(src, 'img'+resizeOptions.ext).size({ bufferStream: true }, function (err, size) {
-        if (err) return cb(500);
+        if (err) {
+          if (options.debug) console.error(err);
+          return cb(500);
+        }
         
         var ops = utils.calculateOps(size, resizeOptions);
         if (!ops) return cb(404);
@@ -168,7 +176,10 @@ function handleRequest(options, req, res, d, cache) {
 
       if (options.dest) {
         options.dest(resizeOptions, function (err, destStream) {
-          if (err) return cb(500);
+          if (err) {
+            if (options.debug) console.error(err);
+            return cb(500);
+          }
           if (destStream) {
             d.add(finalStream.pipe(destStream));
           }
@@ -181,7 +192,7 @@ function handleRequest(options, req, res, d, cache) {
     }
   ], function (err, finalStream, lastModified) {
     if (err) {
-      console.error(req.url, err);
+      if (options.debug) console.error(req.url, err);
       if (!res.headersSent) {
         res.removeHeader('Cache-Control');
         res.removeHeader('Last-Modified');
