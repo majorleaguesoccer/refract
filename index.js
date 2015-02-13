@@ -181,10 +181,13 @@ function handleRequest(options, req, res, d, cache) {
     }
   ], function (err, finalStream, lastModified) {
     if (err) {
-      res.removeHeader('Cache-Control');
-      res.removeHeader('Last-Modified');
-      res.removeHeader('Content-Type');
-      res.statusCode = err;
+      console.error(req.url, err);
+      if (!res.headersSent) {
+        res.removeHeader('Cache-Control');
+        res.removeHeader('Last-Modified');
+        res.removeHeader('Content-Type');
+        res.statusCode = err;
+      }
       return res.end();
     }
 
