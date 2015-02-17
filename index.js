@@ -193,7 +193,7 @@ function handleRequest(options, req, res, d, cache) {
     }
   ], function (err, finalStream, lastModified) {
     if (err) {
-      if (options.debug) console.error(req.url, err, err.stack);
+      if (options.debug || err === 500) console.error(req.url, err, err.stack);
       if (!res.headersSent) {
         res.removeHeader('Cache-Control');
         res.removeHeader('Last-Modified');
