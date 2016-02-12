@@ -20,6 +20,7 @@ var http = require('http')
 function defaults(options) {
   var opt = {
     parse: utils.parseRequest
+  , calculateImageOptions: utils.calculateOps
   , cacheDuration: 2628000
   , clientCacheDuration: 3600
   , memoryCache: true
@@ -93,7 +94,11 @@ module.exports = function(options) {
 
 function handleRequest(options, req, res, d, cache) {
   var uri = url.parse(req.url);
+  
+
   var resizeOptions = options.parse(uri.pathname);
+
+
   resizeOptions.cacheDuration = options.cacheDuration;
   resizeOptions.clientCacheDuration = options.clientCacheDuration;
 
@@ -148,7 +153,7 @@ function handleRequest(options, req, res, d, cache) {
           return cb(500);
         }
         
-        var ops = utils.calculateOps(size, resizeOptions);
+        var ops = options.calculateImageOptions(size, resizeOptions);
         if (!ops) return cb(404);
 
         return cb(null, this, lastModified, ops);
