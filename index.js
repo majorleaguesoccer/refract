@@ -167,18 +167,20 @@ function handleRequest(options, req, res, d, cache) {
       debug('[handleRequest.source] starting: options=`%j`', resizeOptions);
 
       options.source(resizeOptions, function(err, src, lastModified) {
-        if (err) {
-          debug('[handleRequest.source] error:', err, err.stack);
-          return cb(500);
-        }
-        if (resizeOptions.modifiedSince &&
-          +resizeOptions.modifiedSince >= +lastModified) {
-          return cb(304);
-        }
-        if (!src) return cb(404);
-
         if (src instanceof Stream) d.add(src);
-        return cb(null, src, lastModified);
+
+        setTimeout(function() {
+          if (err) {
+            debug('[handleRequest.source] error:', err, err.stack);
+            return cb(500);
+          }
+          if (resizeOptions.modifiedSince &&
+            +resizeOptions.modifiedSince >= +lastModified) {
+            return cb(304);
+          }
+          if (!src) return cb(404);
+          return cb(null, src, lastModified);
+        });
       });
     }
 

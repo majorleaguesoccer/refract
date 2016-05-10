@@ -169,8 +169,6 @@ describe('server', function () {
   });
 
   it('should return 500 for source stream error', function (done) {
-    this.timeout(5000);
-
     request(srcError)
       .get('/x200.jpg')
       .expect(500, done);
