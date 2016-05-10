@@ -3,13 +3,14 @@
 var http = require('http')
   , url = require('url')
   , gm = require('gm')
+  , Promise = require('bluebird')
   , utils = require('./lib/utils')
   , async = require('async')
   , domain = require('domain')
   , Stream = require('stream').Stream
   , allowedExtensions = ['.png', '.jpg']
   , concat = require('concat-stream')
-  , Q = require('q')
+  , debug = require('debug')('refract')
   ;
 
   var mimeTypes = {
@@ -25,14 +26,19 @@ function defaults(options) {
   , clientCacheDuration: 3600
   , memoryCache: true
   , memoryCacheDuration: 30000
-  , debug: false
   , imageMagick: false
   };
   for (var x in options) opt[x] = options[x];
   return opt;
 }
 
-module.exports = function(options) {
+/**
+ * Refract constructor
+ *
+ * @param {Object} options
+ */
+
+module.exports = function Refract(options) {
   var inProgress = {}
     , cache = require('memory-cache')
     ;
@@ -42,62 +48,88 @@ module.exports = function(options) {
   if (!options.source) throw new Error('You must provide a source stream function');
   if (!options.parse) throw new Error('You must provide a request parsing function');
 
-  var server = http.createServer(function (req, res) {
+  debug('[init] starting: options=`%j`', options);
+
+  return http.createServer(function(req, res) {
     var d = domain.create();
-    d.on('error', function (err) {
-      if (options.debug) console.error(err, err.stack);
-      res.removeHeader('Cache-Control');
-      res.removeHeader('Last-Modified');
-      res.removeHeader('Content-Type');
-      res.statusCode = 500;
-      res.end();      
+    d.on('error', function(err) {
+      debug('[request] domain error: err=`%s` \n%s\n', err, err.stack);
+
+      if (!res.headersSent) {
+        res.removeHeader('Cache-Control');
+        res.removeHeader('Last-Modified');
+        res.removeHeader('Content-Type');
+        res.statusCode = 500;
+      }
+
+      // Check that the response has not already finished elsewhere
+      if (!res.finished) res.end();
     });
     d.add(req);
     d.add(res);
 
-    d.run(function () {
+    d.run(function() {
       // if we are doing memory caching and we haven't cached yet
-      // queue up requests after the first one, and then resolve them 
+      // queue up requests after the first one, and then resolve them
       // with that result
-      var uri = url.parse(req.url);
-      if (options.memoryCache && !cache.get(uri.pathname)) {
-        var otherReq = inProgress[uri.pathname];
-        if (otherReq) {
-          otherReq.then(function () {
-            handleRequest(options, req, res, d, cache);
-          });
-        } else {
-          var deferred = Q.defer();
-          inProgress[uri.pathname] = deferred.promise;
+      var uri = url.parse(req.url)
+        , path = uri.pathname
+        ;
 
-          res.on('finish', function () {
-            deferred.resolve();
-            delete inProgress[uri.pathname];
-          });
-          // not the greatest way to handle this, but works
-          // all the queued requests will stomp
-          res.on('close', function () {
-            inProgress[uri.pathname].resolve();
-            delete inProgress[uri.pathname];
-          });
+      debug('[request] starting: url=`%s`', path);
 
-          handleRequest(options, req, res, d, cache);
-        }
-        return;
+      var handler = function() {
+        debug('[request] running handler');
+
+        handleRequest(options, req, res, d, cache);
+      };
+
+      // Short out if no memory caching or already cached
+      if (!options.memoryCache || cache.get(path)) {
+        debug('[request] not cachable: url=`%s`', path);
+        return handler();
       }
 
-      handleRequest(options, req, res, d, cache);
+      // Find the initial request, then tack on resolution
+      var otherReq = inProgress[path];
+      if (otherReq) {
+        debug('[request] req in progress, waiting: url=`%s`', path);
+        return otherReq.then(handler);
+      }
+
+
+      // Create a new promise chain to allow subsequent requests to
+      // tag onto the initial one, preventing parallell processing
+      debug('[request] creating promise');
+      inProgress[path] = new Promise(function(resolve, reject) {
+
+        // Response ended before the `end` event, cleanup
+        res.on('finish', function(e) {
+          debug('[request] res finished: url=`%s`', path, e);
+          if (inProgress[path]) delete inProgress[path];
+          resolve();
+        });
+
+        // not the greatest way to handle this, but works
+        // all the queued requests will stomp
+        res.on('close', function(e) {
+          debug('[request] res closed: url=`%s`', path, e);
+          if (inProgress[path]) delete inProgress[path];
+          resolve();
+        });
+      });
+
+      handler();
     });
   });
-  return server;
 };
 
 function handleRequest(options, req, res, d, cache) {
-  var uri = url.parse(req.url);
-  
+  var uri = url.parse(req.url)
+    , resizeOptions = options.parse(uri.pathname)
+    ;
 
-  var resizeOptions = options.parse(uri.pathname);
-
+  debug('[handleRequest] url=`%s`', req.url);
 
   resizeOptions.cacheDuration = options.cacheDuration;
   resizeOptions.clientCacheDuration = options.clientCacheDuration;
@@ -125,18 +157,21 @@ function handleRequest(options, req, res, d, cache) {
       res.setHeader('Content-Type', mimeTypes[resizeOptions.ext]);
       res.setHeader('Cache-Control', 'public, s-maxage='+cachedResponse.cacheDuration + ', max-age=' + cachedResponse.clientCacheDuration); // one month
       res.setHeader('Last-Modified', cachedResponse.lastModified.toUTCString());
+
       return res.end(cachedResponse.buffer);
     }
   }
 
   async.waterfall([
-    function (cb) {
-      options.source(resizeOptions, function (err, src, lastModified) {
+    function source(cb) {
+      debug('[handleRequest.source] starting: options=`%j`', resizeOptions);
+
+      options.source(resizeOptions, function(err, src, lastModified) {
         if (err) {
-          if (options.debug) console.error(err, err.stack);
+          debug('[handleRequest.source] error:', err, err.stack);
           return cb(500);
         }
-        if (resizeOptions.modifiedSince && 
+        if (resizeOptions.modifiedSince &&
           +resizeOptions.modifiedSince >= +lastModified) {
           return cb(304);
         }
@@ -146,20 +181,29 @@ function handleRequest(options, req, res, d, cache) {
         return cb(null, src, lastModified);
       });
     }
-  , function (src, lastModified, cb) {
-      gm(src, 'img'+resizeOptions.ext).options({ imageMagick: options.imageMagick }).size({ bufferStream: true }, function (err, size) {
+
+  , function convert(src, lastModified, cb) {
+      var imOpts = { imageMagick: options.imageMagick }
+        , sizeOpts = { bufferStream: true }
+        ;
+
+      debug('[handleRequest.convert] starting', typeof src);
+
+      gm(src, 'img'+resizeOptions.ext).options(imOpts).size(sizeOpts, function(err, size) {
         if (err) {
-          if (options.debug) console.error(err, err.stack);
+          debug('[handleRequest.convert] error:', err, err.stack);
           return cb(500);
         }
-        
         var ops = options.calculateImageOptions(size, resizeOptions);
         if (!ops) return cb(404);
 
         return cb(null, this, lastModified, ops);
       });
     }
-  , function (midStream, lastModified, ops, cb) {
+
+  , function destination(midStream, lastModified, ops, cb) {
+      debug('[handleRequest.destination] starting: opts=`%j`', ops);
+
       if (ops.resize) {
         midStream = midStream
           .resize(ops.resize.width, ops.resize.height)
@@ -172,6 +216,7 @@ function handleRequest(options, req, res, d, cache) {
 
       var finalStream = midStream.noProfile().stream();
       d.add(finalStream);
+
       if (options.through) {
         var throughStream = options.through(resizeOptions);
         if (throughStream) {
@@ -181,9 +226,9 @@ function handleRequest(options, req, res, d, cache) {
       }
 
       if (options.dest) {
-        options.dest(resizeOptions, function (err, destStream) {
+        return options.dest(resizeOptions, function(err, destStream) {
           if (err) {
-            if (options.debug) console.error(err, err.stack);
+            debug('[handleRequest.destination] error:', err, err.stack);
             return cb(500);
           }
           if (destStream) {
@@ -191,31 +236,43 @@ function handleRequest(options, req, res, d, cache) {
           }
           cb(null, finalStream, lastModified);
         });
-        return;
       }
 
       cb(null, finalStream, lastModified);
     }
-  ], function (err, finalStream, lastModified) {
+  ], function finish(err, finalStream, lastModified) {
     if (err) {
-      if (options.debug || err === 500) console.error(req.url, err, err.stack);
+      debug('[handleRequest.finish] error, ending: url=`%s` err=`%s`', req.url, err, err.stack);
+
       if (!res.headersSent) {
         res.removeHeader('Cache-Control');
         res.removeHeader('Last-Modified');
         res.removeHeader('Content-Type');
         res.statusCode = err;
       }
-      return res.end();
+
+      // Ensure the response has not ended via domain erroring
+      if (!res.finished) res.end();
+      return;
     }
+    debug('[handleRequest.finish] ending: url=`%s`', req.url);
 
     var modified = lastModified || new Date();
-    res.setHeader('Content-Type', mimeTypes[resizeOptions.ext]);
-    res.setHeader('Cache-Control', 'public, s-maxage='+resizeOptions.cacheDuration+', max-age='+resizeOptions.clientCacheDuration);
-    res.setHeader('Last-Modified', modified.toUTCString());
+
+    if (!res.headersSent) {
+      res.setHeader('Content-Type', mimeTypes[resizeOptions.ext]);
+      res.setHeader('Cache-Control', 'public, s-maxage='+resizeOptions.cacheDuration+', max-age='+resizeOptions.clientCacheDuration);
+      res.setHeader('Last-Modified', modified.toUTCString());
+    }
 
     if (options.memoryCache && !cache.get(uri.pathname)) {
-      d.add(finalStream.pipe(concat(function (buffer) {
-        cache.put(uri.pathname, { buffer: buffer, lastModified: modified, cacheDuration: resizeOptions.cacheDuration, clientCacheDuration: resizeOptions.clientCacheDuration }, options.memoryCacheDuration);
+      d.add(finalStream.pipe(concat(function(buffer) {
+        cache.put(uri.pathname, {
+          buffer: buffer
+        , lastModified: modified
+        , cacheDuration: resizeOptions.cacheDuration
+        , clientCacheDuration: resizeOptions.clientCacheDuration
+        }, options.memoryCacheDuration);
       })));
     }
 
