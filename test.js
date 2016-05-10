@@ -1,6 +1,7 @@
 'use strict';
 
 var utils = require('./lib/utils')
+  , path = require('path')
   , assert = require('assert')
   , request = require('supertest')
   , refract = require('./index')
@@ -25,7 +26,8 @@ describe('server', function () {
   var date = new Date();
   var app = refract({
     source: function (opts, next) {
-      next(null, fs.createReadStream('./test/doge.jpg'), new Date(date.toUTCString()));
+      var fname = path.join(__dirname, '/test/doge.jpg');
+      next(null, fs.createReadStream(fname), new Date(date.toUTCString()));
     }
   , cacheDuration: 1000
   , clientCacheDuration: 30
@@ -135,7 +137,7 @@ describe('server', function () {
       .get('/300x300.svg')
       .expect(400, done);
   });
-
+  //
   var srcError = refract({
     source: function (opts, next) {
       next(null, fs.createReadStream('./test/nonexistantfile.jpg'), new Date(date.toUTCString()));
@@ -160,7 +162,7 @@ describe('server', function () {
   , dest: function (opts, next) {
       var ws = new stream.Writable();
       ws._write = function(chunk, encoding, callback) {
-        callback(new Error());
+        callback(new Error('Testing Error'));
       };
       next(null, ws);
     }
@@ -171,6 +173,7 @@ describe('server', function () {
       .get('/x200.jpg')
       .expect(500, done);
   });
+
   it('should return 500 for through stream error', function (done) {
     request(throughError)
       .get('/x200.jpg')
@@ -181,6 +184,7 @@ describe('server', function () {
         done();
       });
   });
+
   it('should return 500 for destination stream error', function (done) {
     request(destError)
       .get('/x200.jpg')
