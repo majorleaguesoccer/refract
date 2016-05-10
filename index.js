@@ -168,7 +168,7 @@ function handleRequest(options, req, res, d, cache) {
 
       options.source(resizeOptions, function(err, src, lastModified) {
         if (err) {
-          debug('[source] error:', err, err.stack);
+          debug('[handleRequest.source] error:', err, err.stack);
           return cb(500);
         }
         if (resizeOptions.modifiedSince &&
@@ -191,7 +191,7 @@ function handleRequest(options, req, res, d, cache) {
 
       gm(src, 'img'+resizeOptions.ext).options(imOpts).size(sizeOpts, function(err, size) {
         if (err) {
-          debug('[convert] error:', err, err.stack);
+          debug('[handleRequest.convert] error:', err, err.stack);
           return cb(500);
         }
         var ops = options.calculateImageOptions(size, resizeOptions);
