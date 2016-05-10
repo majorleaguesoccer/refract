@@ -137,7 +137,7 @@ describe('server', function () {
       .get('/300x300.svg')
       .expect(400, done);
   });
-  //
+
   var srcError = refract({
     source: function (opts, next) {
       next(null, fs.createReadStream('./test/nonexistantfile.jpg'), new Date(date.toUTCString()));
@@ -150,7 +150,7 @@ describe('server', function () {
   , through: function (opts) {
       var ts = new stream.Transform();
       ts._transform = function(chunk, encoding, callback) {
-        callback(new Error());
+        callback(new Error('Through Error'));
       };
       return ts;
     }
@@ -162,13 +162,15 @@ describe('server', function () {
   , dest: function (opts, next) {
       var ws = new stream.Writable();
       ws._write = function(chunk, encoding, callback) {
-        callback(new Error('Testing Error'));
+        callback(new Error('Destination Error'));
       };
       next(null, ws);
     }
   });
 
   it('should return 500 for source stream error', function (done) {
+    this.timeout(5000);
+
     request(srcError)
       .get('/x200.jpg')
       .expect(500, done);

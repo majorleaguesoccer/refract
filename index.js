@@ -53,13 +53,17 @@ module.exports = function Refract(options) {
   return http.createServer(function(req, res) {
     var d = domain.create();
     d.on('error', function(err) {
-      debug('[request] domain error:', err, err.stack);
+      debug('[request] domain error: err=`%s` \n%s\n', err, err.stack);
 
-      res.removeHeader('Cache-Control');
-      res.removeHeader('Last-Modified');
-      res.removeHeader('Content-Type');
-      res.statusCode = 500;
-      res.end();
+      if (!res.headersSent) {
+        res.removeHeader('Cache-Control');
+        res.removeHeader('Last-Modified');
+        res.removeHeader('Content-Type');
+        res.statusCode = 500;
+      }
+
+      // Check that the response has not already finished elsewhere
+      if (!res.finished) res.end();
     });
     d.add(req);
     d.add(res);
@@ -93,6 +97,7 @@ module.exports = function Refract(options) {
         return otherReq.then(handler);
       }
 
+
       // Create a new promise chain to allow subsequent requests to
       // tag onto the initial one, preventing parallell processing
       debug('[request] creating promise');
@@ -100,7 +105,7 @@ module.exports = function Refract(options) {
 
         // Response ended before the `end` event, cleanup
         res.on('finish', function(e) {
-          debug('[request] res finished: url=`%s`', url, e);
+          debug('[request] res finished: url=`%s`', path, e);
           if (inProgress[path]) delete inProgress[path];
           resolve();
         });
@@ -108,7 +113,7 @@ module.exports = function Refract(options) {
         // not the greatest way to handle this, but works
         // all the queued requests will stomp
         res.on('close', function(e) {
-          debug('[request] res finished: url=`%s`', url, e);
+          debug('[request] res closed: url=`%s`', path, e);
           if (inProgress[path]) delete inProgress[path];
           resolve();
         });
@@ -152,13 +157,14 @@ function handleRequest(options, req, res, d, cache) {
       res.setHeader('Content-Type', mimeTypes[resizeOptions.ext]);
       res.setHeader('Cache-Control', 'public, s-maxage='+cachedResponse.cacheDuration + ', max-age=' + cachedResponse.clientCacheDuration); // one month
       res.setHeader('Last-Modified', cachedResponse.lastModified.toUTCString());
+
       return res.end(cachedResponse.buffer);
     }
   }
 
   async.waterfall([
     function source(cb) {
-      debug('[request.source] starting: options=`%j`', resizeOptions);
+      debug('[handleRequest.source] starting: options=`%j`', resizeOptions);
 
       options.source(resizeOptions, function(err, src, lastModified) {
         if (err) {
@@ -181,7 +187,7 @@ function handleRequest(options, req, res, d, cache) {
         , sizeOpts = { bufferStream: true }
         ;
 
-      debug('[request.convert] size=`%s`', src.length);
+      debug('[handleRequest.convert] starting', typeof src);
 
       gm(src, 'img'+resizeOptions.ext).options(imOpts).size(sizeOpts, function(err, size) {
         if (err) {
@@ -196,7 +202,7 @@ function handleRequest(options, req, res, d, cache) {
     }
 
   , function destination(midStream, lastModified, ops, cb) {
-      debug('[request.destination] starting: opts=`%j`', ops);
+      debug('[handleRequest.destination] starting: opts=`%j`', ops);
 
       if (ops.resize) {
         midStream = midStream
@@ -210,6 +216,7 @@ function handleRequest(options, req, res, d, cache) {
 
       var finalStream = midStream.noProfile().stream();
       d.add(finalStream);
+
       if (options.through) {
         var throughStream = options.through(resizeOptions);
         if (throughStream) {
@@ -219,9 +226,9 @@ function handleRequest(options, req, res, d, cache) {
       }
 
       if (options.dest) {
-        options.dest(resizeOptions, function(err, destStream) {
+        return options.dest(resizeOptions, function(err, destStream) {
           if (err) {
-            debug('[dest] error:', err, err.stack);
+            debug('[handleRequest.destination] error:', err, err.stack);
             return cb(500);
           }
           if (destStream) {
@@ -229,14 +236,13 @@ function handleRequest(options, req, res, d, cache) {
           }
           cb(null, finalStream, lastModified);
         });
-        return;
       }
 
       cb(null, finalStream, lastModified);
     }
   ], function finish(err, finalStream, lastModified) {
     if (err) {
-      debug('[end] finishing: url=`%s`', req.url, err, err.stack);
+      debug('[handleRequest.finish] error, ending: url=`%s` err=`%s`', req.url, err, err.stack);
 
       if (!res.headersSent) {
         res.removeHeader('Cache-Control');
@@ -244,17 +250,20 @@ function handleRequest(options, req, res, d, cache) {
         res.removeHeader('Content-Type');
         res.statusCode = err;
       }
-      return res.end();
+
+      // Ensure the response has not ended via domain erroring
+      if (!res.finished) res.end();
+      return;
     }
-    debug('[end] finishing: url=`%s`', url);
+    debug('[handleRequest.finish] ending: url=`%s`', req.url);
 
     var modified = lastModified || new Date();
 
-    // if (!res.headersSent) {
+    if (!res.headersSent) {
       res.setHeader('Content-Type', mimeTypes[resizeOptions.ext]);
       res.setHeader('Cache-Control', 'public, s-maxage='+resizeOptions.cacheDuration+', max-age='+resizeOptions.clientCacheDuration);
       res.setHeader('Last-Modified', modified.toUTCString());
-    // }
+    }
 
     if (options.memoryCache && !cache.get(uri.pathname)) {
       d.add(finalStream.pipe(concat(function(buffer) {
