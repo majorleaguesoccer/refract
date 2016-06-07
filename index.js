@@ -97,7 +97,6 @@ module.exports = function Refract(options) {
         return otherReq.then(handler);
       }
 
-
       // Create a new promise chain to allow subsequent requests to
       // tag onto the initial one, preventing parallell processing
       debug('[request] creating promise');
@@ -157,6 +156,9 @@ function handleRequest(options, req, res, d, cache) {
       res.setHeader('Content-Type', mimeTypes[resizeOptions.ext]);
       res.setHeader('Cache-Control', 'public, s-maxage='+cachedResponse.cacheDuration + ', max-age=' + cachedResponse.clientCacheDuration); // one month
       res.setHeader('Last-Modified', cachedResponse.lastModified.toUTCString());
+
+      /* CORS headers */
+      setCORSHeaders(res);
 
       return res.end(cachedResponse.buffer);
     }
@@ -265,6 +267,9 @@ function handleRequest(options, req, res, d, cache) {
       res.setHeader('Content-Type', mimeTypes[resizeOptions.ext]);
       res.setHeader('Cache-Control', 'public, s-maxage='+resizeOptions.cacheDuration+', max-age='+resizeOptions.clientCacheDuration);
       res.setHeader('Last-Modified', modified.toUTCString());
+
+      /* CORS headers */
+      setCORSHeaders(res);
     }
 
     if (options.memoryCache && !cache.get(uri.pathname)) {
@@ -280,4 +285,11 @@ function handleRequest(options, req, res, d, cache) {
 
     finalStream.pipe(res);
   });
+}
+
+function setCORSHeaders(res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Request-Method', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'OPTIONS, GET');
+  res.setHeader('Access-Control-Allow-Headers', '*');
 }
